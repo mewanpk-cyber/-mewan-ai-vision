@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="ku" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#07111d">
+
+<title>MEWAN VISION — AI سکان</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+
+<style>
+*{
+  box-sizing:border-box;
+}
+
+html,body{
+  margin:0;
+  width:100%;
+  height:100%;
+  background:#050b12;
+  color:#fff;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+body{
+  overflow:hidden;
+}
+
+.app{
+  width:100%;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+}
+
+.header{
+  height:72px;
+  min-height:72px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 18px;
+  border-bottom:1px solid #1b2a39;
+  background:#08121d;
+}
+
+.logo{
+  font-size:22px;
+  font-weight:900;
+  letter-spacing:1px;
+}
+
+.status{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:13px;
+  color:#8fa3b8;
+}
+
+.dot{
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:#555;
+}
+
+.dot.on{
+  background:#00e5a0;
+  box-shadow:0 0 12px #00e5a0;
+}
+
+.main{
+  flex:1;
+  min-height:0;
+  position:relative;
+  display:flex;
+  flex-direction:column;
+}
+
+.camera{
+  position:relative;
+  flex:1;
+  min-height:0;
+  background:#000;
+  overflow:hidden;
+}
+
+video{
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:cover;
+  transform:scaleX(-1);
+}
+
+canvas{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  pointer-events:none;
+}
+
+.scan-title{
+  position:absolute;
+  top:15px;
+  right:15px;
+  z-index:5;
+  background:rgba(5,12,20,.82);
+  border:1px solid #203446;
+  border-radius:12px;
+  padding:10px 14px;
+  backdrop-filter:blur(10px);
+}
+
+.scan-title b{
+  display:block;
+  color:#00e5a0;
+  font-size:14px;
+}
+
+.scan-title span{
+  color:#8fa3b8;
+  font-size:11px;
+}
+
+.controls{
+  position:absolute;
+  bottom:18px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:10;
+  display:flex;
+  gap:9px;
+  width:calc(100% - 24px);
+  max-width:650px;
+  justify-content:center;
+}
+
+button{
+  border:1px solid #263a4d;
+  background:rgba(7,17,29,.92);
+  color:#fff;
+  border-radius:12px;
+  padding:12px 15px;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+}
+
+button:active{
+  transform:scale(.96);
+}
+
+button.primary{
+  background:#00a878;
+  border-color:#00e5a0;
+}
+
+button.danger{
+  background:#7d2030;
+  border-color:#b73b4f;
+}
+
+.info{
+  position:absolute;
+  top:15px;
+  left:15px;
+  z-index:5;
+  direction:rtl;
+  background:rgba(5,12,20,.82);
+  border:1px solid #203446;
+  border-radius:12px;
+  padding:10px 13px;
+  color:#9db0c3;
+  font-size:11px;
+  backdrop-filter:blur(10px);
+}
+
+.info strong{
+  color:#fff;
+}
+
+.bottom{
+  height:145px;
+  min-height:145px;
+  background:#08121d;
+  border-top:1px solid #1b2a39;
+  padding:12px;
+  display:flex;
+  gap:12px;
+  overflow:hidden;
+}
+
+.panel{
+  flex:1;
+  min-width:0;
+  border:1px solid #1c3042;
+  border-radius:14px;
+  background:#0a1723;
+  padding:12px;
+  overflow:auto;
+}
+
+.panel h3{
+  margin:0 0 8px;
+  font-size:13px;
+  color:#00e5a0;
+}
+
+.objects{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+}
+
+.object{
+  border:1px solid #23445b;
+  background:#0c1d2b;
+  border-radius:9px;
+  padding:7px 9px;
+  font-size:11px;
+}
+
+.percent{
+  color:#00e5a0;
+  margin-right:4px;
+}
+
+.log{
+  color:#8fa3b8;
+  font-family:monospace;
+  font-size:10px;
+  line-height:1.6;
+}
+
+.permission{
+  position:absolute;
+  inset:0;
+  z-index:20;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(3,8,13,.95);
+  padding:25px;
+  text-align:center;
+}
+
+.permission-box{
+  max-width:420px;
+  border:1px solid #21384c;
+  background:#091521;
+  border-radius:20px;
+  padding:28px 20px;
+}
+
+.permission-box h1{
+  margin:0 0 10px;
+  color:#00e5a0;
+  font-size:24px;
+}
+
+.permission-box p{
+  color:#9db0c3;
+  line-height:1.8;
+  font-size:14px;
+}
+
+.loader{
+  position:absolute;
+  inset:0;
+  z-index:15;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,.55);
+  font-weight:800;
+}
+
+.loader.show{
+  display:flex;
+}
+
+@media(max-width:650px){
+  .header{
+    height:62px;
+    min-height:62px;
+  }
+
+  .logo{
+    font-size:18px;
+  }
+
+  .controls{
+    flex-wrap:wrap;
+  }
+
+  .controls button{
+    padding:9px 10px;
+    font-size:11px;
+  }
+
+  .bottom{
+    height:125px;
+    min-height:125px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <header class="header">
+    <div class="logo">MEWAN VISION</div>
+
+    <div class="status">
+      <span id="statusDot" class="dot"></span>
+      <span id="statusText">ئامادە نییە</span>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <section class="camera">
+
+      <video id="video" autoplay muted playsinline></video>
+      <canvas id="canvas"></canvas>
+
+      <div class="scan-title">
+        <b>سکانەری AI</b>
+        <span id="modelStatus">AI بار دەکرێت...</span>
+      </div>
+
+      <div class="info">
+        دۆزراوەکان:
+        <strong id="count">0</strong>
+      </div>
+
+      <div id="loader" class="loader">
+        AI ـەکە بار دەکرێت...
+      </div>
+
+      <div class="permission" id="permission">
+        <div class="permission-box">
+          <h1>MEWAN VISION</h1>
+
+          <p>
+            بۆ دەستپێکردنی سیستەمی سکانکردن،
+            دەبێت ڕێگە بە کامێرا بدەیت.
+          </p>
+
+          <button class="primary" id="startBtn">
+            📷 دەستپێکردنی کامێرا
+          </button>
+        </div>
+      </div>
+
+      <div class="controls">
+
+        <button id="cameraBtn" class="primary">
+          📷 کامێرا
+        </button>
+
+        <button id="flipBtn">
+          🔄 پێشەوە / دواوە
+        </button>
+
+        <button id="scanBtn">
+          ▶️ سکان
+        </button>
+
+        <button id="pauseBtn">
+          ⏸️ وەستان
+        </button>
+
+        <button id="clearBtn" class="danger">
+          🗑️ پاککردنەوە
+        </button>
+
+      </div>
+
+    </section>
+
+    <section class="bottom">
+
+      <div class="panel">
+        <h3>🔎 شتە دۆزراوەکان</h3>
+        <div id="objects" class="objects">
+          <div class="object">هیچ شتێک نەدۆزرایەوە</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>🤖 AI Log</h3>
+        <div id="log" class="log">
+          سیستەم ئامادەیە...
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+</div>
+
+<script>
+
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const permission = document.getElementById("permission");
+const startBtn = document.getElementById("startBtn");
+const cameraBtn = document.getElementById("cameraBtn");
+const flipBtn = document.getElementById("flipBtn");
+const scanBtn = document.getElementById("scanBtn");
+const pauseBtn = document.getElementById("pauseBtn");
+const clearBtn = document.getElementById("clearBtn");
+
+const statusDot = document.getElementById("statusDot");
+const statusText = document.getElementById("statusText");
+const modelStatus = document.getElementById("modelStatus");
+const loader = document.getElementById("loader");
+const count = document.getElementById("count");
+const objectsBox = document.getElementById("objects");
+const logBox = document.getElementById("log");
+
+let stream = null;
+let model = null;
+let scanning = false;
+let facingMode = "environment";
+let lastObjects = [];
+
+const labels = {
+  person:"کەس",
+  car:"ئۆتۆمبێل",
+  bicycle:"پاسکیل",
+  motorcycle:"مۆتۆرسیکڵ",
+  bus:"پاس",
+  truck:"تریلەر",
+  traffic_light:"چرای هاتوچۆ",
+  stop_sign:"نیشانی وەستان",
+  dog:"سەگ",
+  cat:"پشیلە",
+  bird:"باڵندە",
+  bottle:"بوتڵ",
+  cup:"قاپ",
+  chair:"کورسی",
+  laptop:"لەپتۆپ",
+  cellphone:"مۆبایل",
+  backpack:"جانتا",
+  umbrella:"چەتر",
+  handbag:"جانتا",
+  suitcase:"جانتا",
+  tv:"تەلەفزیۆن",
+  keyboard:"کیبۆرد",
+  mouse:"ماوس",
+  book:"کتێب"
+};
+
+function log(text){
+  const time = new Date().toLocaleTimeString();
+  logBox.innerHTML =
+    `[${time}] ${text}<br>` + logBox.innerHTML;
+}
+
+function setStatus(text,on=false){
+  statusText.textContent = text;
+  statusDot.classList.toggle("on",on);
+}
+
+function resizeCanvas(){
+
+  if(!video.videoWidth) return;
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+}
+
+window.addEventListener("resize",resizeCanvas);
+
+async function startCamera(){
+
+  try{
+
+    if(stream){
+      stream.getTracks().forEach(t=>t.stop());
+    }
+
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{
+        facingMode:facingMode,
+        width:{ideal:1280},
+        height:{ideal:720}
+      },
+      audio:false
+    });
+
+    video.srcObject = stream;
+
+    await video.play();
+
+    permission.style.display="none";
+
+    resizeCanvas();
+
+    setStatus("کامێرا چالاکە",true);
+
+    log("کامێرا بە سەرکەوتوویی چالاک کرا.");
+
+  }catch(error){
+
+    console.error(error);
+
+    setStatus("هەڵەی کامێرا",false);
+
+    log("نەتوانرا کامێرا بکرێتەوە.");
+
+    alert(
+      "نەتوانرا کامێرا بکرێتەوە.\n\n" +
+      "تکایە ڕێگەی Camera لە Safari/GitHub Pages بدە."
+    );
+  }
+}
+
+async function loadAI(){
+
+  try{
+
+    loader.classList.add("show");
+
+    modelStatus.textContent="AI بار دەکرێت...";
+
+    log("TensorFlow.js دەست پێکرد.");
+
+    model = await cocoSsd.load();
+
+    modelStatus.textContent="AI ئامادەیە";
+
+    loader.classList.remove("show");
+
+    log("مۆدێلی AI ئامادەیە.");
+
+  }catch(error){
+
+    console.error(error);
+
+    modelStatus.textContent="AI هەڵەی هەیە";
+
+    loader.classList.remove("show");
+
+    log("نەتوانرا مۆدێلی AI بار بکرێت.");
+
+  }
+}
+
+function drawBoxes(predictions){
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  if(!predictions.length) return;
+
+  predictions.forEach(pred=>{
+
+    const [x,y,w,h] = pred.bbox;
+
+    const percent = Math.round(pred.score * 100);
+
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#00e5a0";
+    ctx.strokeRect(x,y,w,h);
+
+    const label =
+      (labels[pred.class] || pred.class) +
+      " " + percent + "%";
+
+    ctx.font = "bold 15px sans-serif";
+
+    const textWidth = ctx.measureText(label).width;
+
+    ctx.fillStyle = "#00e5a0";
+    ctx.fillRect(
+      x,
+      Math.max(0,y-27),
+      textWidth+16,
+      27
+    );
+
+    ctx.fillStyle = "#00140e";
+    ctx.fillText(
+      label,
+      x+8,
+      Math.max(19,y-8)
+    );
+
+  });
+}
+
+function showObjects(predictions){
+
+  objectsBox.innerHTML="";
+
+  if(!predictions.length){
+
+    objectsBox.innerHTML =
+      `<div class="object">هیچ شتێکی دڵنیابوونەوەی لێ نەدۆزرایەوە</div>`;
+
+    count.textContent="0";
+
+    return;
+  }
+
+  count.textContent=predictions.length;
+
+  predictions.forEach(pred=>{
+
+    const name = labels[pred.class] || pred.class;
+
+    const div = document.createElement("div");
+
+    div.className="object";
+
+    div.innerHTML=
+      `🔹 ${name}
+       <span class="percent">
+       ${Math.round(pred.score*100)}%
+       </span>`;
+
+    objectsBox.appendChild(div);
+
+  });
+}
+
+async function detect(){
+
+  if(!model || !video.videoWidth || !scanning) return;
+
+  try{
+
+    const predictions =
+      await model.detect(video);
+
+    const filtered =
+      predictions.filter(p=>p.score >= 0.50);
+
+    lastObjects=filtered;
+
+    drawBoxes(filtered);
+    showObjects(filtered);
+
+    if(filtered.length){
+
+      log(
+        `${filtered.length} شت دۆزرایەوە.`
+      );
+    }
+
+  }catch(error){
+
+    console.error(error);
+
+  }
+
+  if(scanning){
+
+    requestAnimationFrame(detect);
+
+  }
+
+}
+
+startBtn.addEventListener("click",async()=>{
+
+  await startCamera();
+
+  if(!model){
+    await loadAI();
+  }
+
+});
+
+cameraBtn.addEventListener("click",async()=>{
+
+  await startCamera();
+
+});
+
+flipBtn.addEventListener("click",async()=>{
+
+  facingMode =
+    facingMode === "environment"
+    ? "user"
+    : "environment";
+
+  await startCamera();
+
+  log(
+    facingMode === "environment"
+    ? "کامێرای دواوە هەڵبژێردرا."
+    : "کامێرای پێشەوە هەڵبژێردرا."
+  );
+
+});
+
+scanBtn.addEventListener("click",async()=>{
+
+  if(!stream){
+
+    await startCamera();
+
+  }
+
+  if(!model){
+
+    await loadAI();
+
+  }
+
+  scanning=true;
+
+  log("سکانکردنی ئۆتۆماتیکی چالاک کرا.");
+
+  detect();
+
+});
+
+pauseBtn.addEventListener("click",()=>{
+
+  scanning=false;
+
+  ctx.clearRect(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+  log("سکان وەستا.");
+
+});
+
+clearBtn.addEventListener("click",()=>{
+
+  ctx.clearRect(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+  objectsBox.innerHTML =
+    `<div class="object">پاککرایەوە</div>`;
+
+  count.textContent="0";
+
+  log("داتاکان پاککرانەوە.");
+
+});
+
+video.addEventListener("loadedmetadata",()=>{
+  resizeCanvas();
+});
+
+loadAI();
+
+</script>
+
+</body>
+</html>
